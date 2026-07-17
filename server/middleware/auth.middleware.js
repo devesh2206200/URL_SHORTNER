@@ -2,13 +2,13 @@ import jwt from "jsonwebtoken";
 import ApiError from "../utils/ApiError.js";
 
 const authMiddleware = (req, res, next) => {
-    console.log("=================================");
-    console.log("Authorization Header:", req.headers.authorization);
+    // console.log("=================================");
+    // console.log("Authorization Header:", req.headers.authorization);
 
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith("Bearer ")) {
-        console.log("❌ No Bearer Token");
+       // console.log("❌ No Bearer Token");
         req.user = null;
         return next();
     }
@@ -20,13 +20,13 @@ const authMiddleware = (req, res, next) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        console.log("✅ Token Verified");
+        //console.log("✅ Token Verified");
         console.log(decoded);
 
         req.user = decoded;
         next();
     } catch (err) {
-        console.log("❌ JWT ERROR:", err.message);
+        console.log(" JWT ERROR:", err.message);
 
         req.user = null;
         next();

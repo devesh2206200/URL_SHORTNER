@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
+import { loginUser, registerUser } from "../api/api";
 
 export default function AuthModal({
   isOpen,
@@ -12,9 +13,6 @@ export default function AuthModal({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const apiUrl =
-    process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   if (!isOpen) return null;
 
@@ -35,41 +33,11 @@ export default function AuthModal({
     setLoading(true);
 
     try {
-      const endpoint = isLogin
-        ? "/api/auth/login"
-        : "/api/auth/register";
-
-      const response = await fetch(`${apiUrl}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
-
-      const data = await response.json();
+      const data = isLogin
+        ? await loginUser(email, password)
+        : await registerUser(email, password);
 
       console.log("Backend Response:", data);
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Authentication failed"
-        );
-      }
-
-      // Backend Response:
-      // {
-      //   statusCode: 200,
-      //   data: {
-      //      user: {...},
-      //      accessToken: "..."
-      //   },
-      //   message: "...",
-      //   success: true
-      // }
 
       const accessToken = data.data.accessToken;
       const user = data.data.user;

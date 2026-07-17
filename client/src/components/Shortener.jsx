@@ -1,8 +1,8 @@
 import { useState } from "react"
-import PulseLoader from "react-spinners/PulseLoader";
+import { PulseLoader } from "react-spinners";
 import { Settings, Calendar, HelpCircle } from "lucide-react";
-
-const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+import toast from 'react-hot-toast';
+import { shortenUrl } from "../api/api";
 
 export default function Shortener(props) {
     const [input, setInput] = useState("")
@@ -18,81 +18,61 @@ export default function Shortener(props) {
     }
 
     async function handleClick() {
-    if (input === "") return;
+        if (input === "") return;
 
-    setLoading(true);
+        setLoading(true);
 
-    try {
-        let expiresAt = null;
+        try {
+            let expiresAt = null;
 
-        if (expiration === "1h") {
-            expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        } else if (expiration === "1d") {
-            expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        } else if (expiration === "7d") {
-            expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-        }
-
-        const headers = {
-            "Content-Type": "application/json",
-        };
-
-        if (props.token) {
-            headers["Authorization"] = `Bearer ${props.token}`;
-        }
-
-        const requestBody = {
-            url: input,
-        };
-
-        if (showAdvanced) {
-            if (customAlias.trim()) {
-                requestBody.customAlias = customAlias.trim();
+            if (expiration === "1h") {
+                expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+            } else if (expiration === "1d") {
+                expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+            } else if (expiration === "7d") {
+                expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
             }
 
-            if (expiresAt) {
-                requestBody.expiresAt = expiresAt;
+            const requestBody = {
+                url: input,
+            };
+
+            if (showAdvanced) {
+                if (customAlias.trim()) {
+                    requestBody.customAlias = customAlias.trim();
+                }
+
+                if (expiresAt) {
+                    requestBody.expiresAt = expiresAt;
+                }
             }
-        }
 
-        const response = await fetch(`${apiUrl}/`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(requestBody),
-        });
+            const data = await shortenUrl(requestBody, props.token);
 
-        const data = await response.json();
+            const newItem = {
+                url: input,
+                shortUrl: data.data.shortUrl,
+                shortUrlId: data.data.shortUrlId,
+                customAlias: customAlias.trim() || null,
+                expiresAt,
+                clicks: data.data.clicks,
+            };
 
-        console.log("Backend Response:", data);
+            props.addLink(newItem);
+            toast.success("URL shortened successfully!");
 
-        if (!response.ok) {
-            alert(data.message || "Server Error");
+            setInput("");
+            setCustomAlias("");
+            setExpiration("never");
+            setShowAdvanced(false);
+        } catch (err) {
+            console.error(err);
+            toast.error(err.message || "Server Connection Error");
+        } finally {
             setLoading(false);
-            return;
         }
-
-        const newItem = {
-            url: input,
-            shortUrl: data.data.shortUrl,
-            shortUrlId: data.data.shortUrlId,
-            customAlias: customAlias.trim() || null,
-            expiresAt,
-            clicks: data.data.clicks,
-        };
-
-        props.addLink(newItem);
-
-        setInput("");
-        setCustomAlias("");
-        setExpiration("never");
-        setShowAdvanced(false);
-    } catch (err) {
-        console.error(err);
-        alert("Server Connection Error");
-    } finally {
-        setLoading(false);
     }
-}
+
     const override = {
         display: "flex",
         justifyContent: "center",

@@ -1,15 +1,11 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-console.log("GROQ_API_KEY:", process.env.GROQ_API_KEY);
-console.log("ENV Loaded:");
-console.log("JWT_SECRET:", process.env.JWT_SECRET);
-console.log("JWT_REFRESH_SECRET:", process.env.JWT_REFRESH_SECRET);
-
+import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import morgan from "morgan";
+import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
 
 import indexRouter from "./routes/index.routes.js";
 import errorHandler from "./middleware/error.middleware.js";
@@ -22,9 +18,18 @@ const PORT = process.env.PORT || 5000;
 // Middlewares
 // ==============================
 
+app.use(helmet());
+app.use(morgan("dev"));
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -37,6 +42,8 @@ app.options("*", cors());
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
+
+app.use(mongoSanitize());
 
 app.use(cookieParser());
 
@@ -70,13 +77,13 @@ app.use(errorHandler);
 mongoose
     .connect(process.env.DATABASE_URL)
     .then(() => {
-        console.log("✅ MongoDB Connected");
+        console.log(" MongoDB Connected");
 
         app.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(` Server running on port ${PORT}`);
         });
     })
     .catch((err) => {
-        console.error("❌ Database Connection Failed");
+        console.error(" Database Connection Failed");
         console.error(err.message);
     });

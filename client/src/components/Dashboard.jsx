@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Trash2, BarChart3, ExternalLink, Calendar, ShieldAlert, ChevronUp, Link2, RefreshCw, QrCode, X, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getUserUrls, deleteUserUrl, getUrlAnalytics, getUrlQR } from '../api/api';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Dashboard({ token, onLogout }) {
   const [urls, setUrls] = useState([]);
@@ -9,78 +11,106 @@ export default function Dashboard({ token, onLogout }) {
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [analytics, setAnalytics] = useState({});
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState({}); // per-card loading: { [id]: boolean }
   const [copiedId, setCopiedId] = useState(null);
   const [qrModal, setQrModal] = useState(null); // { url, src }
 
-  useEffect(() => { fetchUrls(); }, []);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  async function authFetch(url, opts = {}) {
-    const res = await fetch(url, {
-      ...opts,
-      credentials: 'include',
-      headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 401) { onLogout(); return res; }
-    return res;
-  }
+  useEffect(() => { fetchUrls(); }, []);
 
   async function fetchUrls() {
     if (!token) { setError('Please log in to view your dashboard.'); setLoading(false); return; }
     setLoading(true); setError('');
     try {
-      const res = await authFetch(`${API}/api/user/urls`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to load URLs.');
+      const data = await getUserUrls(token);
       setUrls(data.data || []);
     } catch (err) {
+      if (err.status === 401) {
+        onLogout();
+        return;
+      }
       setError(err.message);
+      toast.error(err.message || 'Failed to load URLs.');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this link and all its analytics?')) return;
-    const res = await authFetch(`${API}/api/user/urls/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+  function handleDelete(id) {
+    setConfirmDeleteId(id);
+  }
+
+  async function executeDelete(id) {
+    const toastId = toast.loading('Deleting link...');
+    try {
+      await deleteUserUrl(id, token);
       setUrls(urls.filter(u => u._id !== id));
       if (expandedId === id) setExpandedId(null);
-    } else {
-      alert('Failed to delete.');
+      toast.success('Link deleted successfully!', { id: toastId });
+    } catch (err) {
+      if (err.status === 401) {
+        toast.dismiss(toastId);
+        onLogout();
+        return;
+      }
+      toast.error(err.message || 'Failed to delete.', { id: toastId });
     }
   }
 
   async function toggleAnalytics(shortUrlId, id) {
     if (expandedId === id) { setExpandedId(null); return; }
-    setExpandedId(id); setAnalyticsLoading(true);
-    try {
-      const res = await authFetch(`${API}/api/user/urls/${shortUrlId}/analytics`);
-      const data = await res.json();
-      if (res.ok) setAnalytics(prev => ({ ...prev, [id]: data.data }));
-    } catch (err) { console.error(err); }
-    finally { setAnalyticsLoading(false); }
+    setExpandedId(id);
+    
+    // Only fetch if we don't have it yet
+    if (!analytics[id]) {
+      setAnalyticsLoading(prev => ({ ...prev, [id]: true }));
+      try {
+        const data = await getUrlAnalytics(shortUrlId, token);
+        setAnalytics(prev => ({ ...prev, [id]: data.data }));
+      } catch (err) {
+        if (err.status === 401) {
+          onLogout();
+          return;
+        }
+        console.error(err);
+        toast.error(err.message || 'Failed to load analytics.');
+      } finally {
+        setAnalyticsLoading(prev => ({ ...prev, [id]: false }));
+      }
+    }
   }
 
   function handleCopy(link, id) {
     navigator.clipboard.writeText(link);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+    toast.success('Link copied to clipboard!');
   }
 
-async function handleQR(shortUrlId, shortLink) {
-  const res = await authFetch(`${API}/api/urls/${shortUrlId}/qr`);
-  const data = await res.json();
-  if (res.ok) setQrModal({ url: shortLink, src: data.data.qrCode });
-  else alert('Failed to generate QR code.');
-}
+  async function handleQR(shortUrlId, shortLink) {
+    const toastId = toast.loading('Generating QR code...');
+    try {
+      const data = await getUrlQR(shortUrlId, token);
+      setQrModal({ url: shortLink, src: data.data.qrCode });
+      toast.dismiss(toastId);
+    } catch (err) {
+      if (err.status === 401) {
+        toast.dismiss(toastId);
+        onLogout();
+        return;
+      }
+      toast.error(err.message || 'Failed to generate QR code.', { id: toastId });
+    }
+  }
 
-function downloadQR() {
-  const a = document.createElement('a');
-  a.href = qrModal.src;
-  a.download = 'qrcode.png';
-  a.click();
-}
+  function downloadQR() {
+    if (!qrModal) return;
+    const a = document.createElement('a');
+    a.href = qrModal.src;
+    a.download = 'qrcode.png';
+    a.click();
+  }
 
   return (
     <div className="dashboard-container">
@@ -92,6 +122,38 @@ function downloadQR() {
             <p className="qr-url-label">{qrModal.url}</p>
             <img src={qrModal.src} alt="QR Code" className="qr-image" />
             <button className="btn-qr-download" onClick={downloadQR}><Download size={15} /> Download PNG</button>
+          </div>
+        </div>
+      )}
+      {confirmDeleteId && (
+        <div className="auth-overlay" onClick={() => setConfirmDeleteId(null)}>
+          <div className="auth-modal-card" onClick={e => e.stopPropagation()}>
+            <button className="auth-close-btn" onClick={() => setConfirmDeleteId(null)}><X size={20} /></button>
+            <div className="auth-header" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: 700 }}>Delete Link?</h2>
+              <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                Are you sure you want to delete this link and all its analytics? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button 
+                className="btn-logout" 
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-signup" 
+                style={{ backgroundColor: 'hsl(0, 72%, 51%)', padding: '0.5rem 1.5rem' }} 
+                onClick={() => {
+                  const id = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  executeDelete(id);
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -119,6 +181,8 @@ function downloadQR() {
             const isExpanded = expandedId === url._id;
             const isExpired = url.expiresAt && new Date() > new Date(url.expiresAt);
             const shortLink = `${API}/${url.shortUrlId}`;
+            const isCardLoading = !!analyticsLoading[url._id];
+            
             return (
               <div className={`url-dashboard-card ${isExpired ? 'expired-border' : ''}`} key={url._id}>
                 <div className="url-card-row">
@@ -167,7 +231,7 @@ function downloadQR() {
 
                 {isExpanded && (
                   <div className="analytics-drawer">
-                    {analyticsLoading ? (
+                    {isCardLoading ? (
                       <div className="flex justify-center py-10"><div className="spinner-small"></div></div>
                     ) : !analytics[url._id] ? (
                       <p className="no-data-text">Failed to load analytics.</p>

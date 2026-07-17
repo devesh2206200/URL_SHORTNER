@@ -1,31 +1,35 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import logo from '../images/logo.svg';
 import { User, LogOut, LayoutDashboard, Home } from 'lucide-react';
 
-export default function Header({ user, onAuthClick, onLogout, view, setView }) {
+export default function Header({ user, onAuthClick, onLogout }) {
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   return (
     <header className="header flex justify-between items-center padding-xy">
       <div className="flex items-center gap-10">
-        <div className="logo cursor-pointer" onClick={() => setView('home')}>
+        <Link to="/" className="logo cursor-pointer">
           <img src={logo} alt="Shortly Logo" />
-        </div>
+        </Link>
         
         {user && (
           <nav className="header-nav hidden md:flex items-center gap-6">
-            <button 
-              className={`nav-link-btn ${view === 'home' ? 'active-nav' : ''}`} 
-              onClick={() => setView('home')}
+            <Link 
+              to="/" 
+              className={`nav-link-btn ${currentPath === '/' ? 'active-nav' : ''}`} 
             >
               <Home size={16} />
               Home
-            </button>
-            <button 
-              className={`nav-link-btn ${view === 'dashboard' ? 'active-nav' : ''}`} 
-              onClick={() => setView('dashboard')}
+            </Link>
+            <Link 
+              to="/dashboard" 
+              className={`nav-link-btn ${currentPath === '/dashboard' ? 'active-nav' : ''}`} 
             >
               <LayoutDashboard size={16} />
               Dashboard
-            </button>
+            </Link>
           </nav>
         )}
       </div>
@@ -34,20 +38,20 @@ export default function Header({ user, onAuthClick, onLogout, view, setView }) {
         {user ? (
           <div className="user-profile-header flex items-center gap-4">
             {/* Mobile Navigation icons */}
-            <button 
-              className={`nav-link-icon-btn md:hidden ${view === 'home' ? 'active-nav' : ''}`} 
-              onClick={() => setView('home')}
+            <Link 
+              to="/" 
+              className={`nav-link-icon-btn md:hidden ${currentPath === '/' ? 'active-nav' : ''}`} 
               title="Home"
             >
               <Home size={18} />
-            </button>
-            <button 
-              className={`nav-link-icon-btn md:hidden ${view === 'dashboard' ? 'active-nav' : ''}`} 
-              onClick={() => setView('dashboard')}
+            </Link>
+            <Link 
+              to="/dashboard" 
+              className={`nav-link-icon-btn md:hidden ${currentPath === '/dashboard' ? 'active-nav' : ''}`} 
               title="Dashboard"
             >
               <LayoutDashboard size={18} />
-            </button>
+            </Link>
 
             <div className="user-details hidden sm:flex items-center gap-2">
               <div className="avatar">

@@ -12,23 +12,23 @@ const router = express.Router();
 
 // Auth
 router.post("/api/auth/register", authLimiter, validate(registerSchema), register);
-router.post("/api/auth/login",    authLimiter, validate(loginSchema), login);
-router.post("/api/auth/logout",   requireAuth, logout);
-router.post("/api/auth/refresh",  refreshToken);
+router.post("/api/auth/login", authLimiter, validate(loginSchema), login);
+router.post("/api/auth/logout", requireAuth, logout);
+router.post("/api/auth/refresh", refreshToken);
 
 // User
-router.get("/api/user/urls",                        requireAuth, getUserUrls);
-router.delete("/api/user/urls/:id",                 requireAuth, deleteUserUrl);
-router.get("/api/user/urls/:shortUrlId/analytics",  requireAuth, getUrlAnalytics);
+router.get("/api/user/urls",  requireAuth, getUserUrls);
+router.delete("/api/user/urls/:id", requireAuth, deleteUserUrl);
+router.get("/api/user/urls/:shortUrlId/analytics", requireAuth, getUrlAnalytics);
 
 // URLs
-router.post("/",                  authMiddleware, shortenLimiter, validate(createUrlSchema), createShortUrl);
-router.put("/api/urls/:id",       requireAuth, updateUrl);
-router.delete("/",                deleteUrl);
+router.post("/", authMiddleware, shortenLimiter, validate(createUrlSchema), createShortUrl);
+router.put("/api/urls/:id", requireAuth, updateUrl);
+router.delete("/", deleteUrl);
 router.get("/api/urls/:shortUrlId/qr", generateQRCode);
 
 // Health check
-router.get("/", (req, res) => res.json({ success: true, message: "URL Shortener API Running 🚀" }));
+router.get("/", (req, res) => res.json({ success: true, message: "URL Shortener API Running " }));
 
 // Redirect — keep LAST
 router.get("/:shortUrlId", redirectToOriginalUrl);

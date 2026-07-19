@@ -14,76 +14,99 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 
-// ==============================
-// Middlewares
-// ==============================
+// ======================================
+// Security & Logging
+// ======================================
 
 app.use(helmet());
 app.use(morgan("dev"));
 
+// ======================================
+// CORS Configuration
+// ======================================
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  process.env.CLIENT_URL
+  process.env.CLIENT_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      // Allow requests like Postman or server-to-server
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
 
-// Handle preflight OPTIONS requests
+// Handle preflight requests
 app.options("*", cors());
 
-app.use(express.json());
+// ======================================
+// Body Parser
+// ======================================
 
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(mongoSanitize());
+// ======================================
+// Security
+// ======================================
 
+app.use(mongoSanitize());
 app.use(cookieParser());
 
-// ==============================
-// Test Route
-// ==============================
+// ======================================
+// Health Check
+// ======================================
 
-app.get("/test", (req, res) => {
-    res.send("Test Route");
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "URL Shortener API is Running 🚀",
+  });
 });
 
+app.get("/test", (req, res) => {
+  res.send("Test Route");
+});
 
-
-
-// ==============================
+// ======================================
 // Routes
-// ==============================
+// ======================================
 
 app.use("/", indexRouter);
 
-// ==============================
-// Global Error Handler
-// ==============================
+// ======================================
+// Error Handler
+// ======================================
 
 app.use(errorHandler);
 
-// ==============================
-// Database Connection
-// ==============================
+// ======================================
+// MongoDB
+// ======================================
 
 mongoose
-    .connect(process.env.DATABASE_URL)
-    .then(() => {
-        console.log(" MongoDB Connected");
+  .connect(process.env.DATABASE_URL)
+  .then(() => {
+    console.log("✅ MongoDB Connected");
 
-        app.listen(PORT, () => {
-            console.log(` Server running on port ${PORT}`);
-        });
-    })
-    .catch((err) => {
-        console.error(" Database Connection Failed");
-        console.error(err.message);
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
     });
+  })
+  .catch((err) => {
+    console.error("❌ Database Connection Failed");
+    console.error(err.message);
+  });
